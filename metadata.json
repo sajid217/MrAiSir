@@ -1,0 +1,9 @@
+{
+  "name": "MyAI",
+  "description": "A powerful, personalized AI Assistant powered by Gemini 2.0 Flash with voice support, image analysis, and real-time streaming.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": []
+}

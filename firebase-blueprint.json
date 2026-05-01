@@ -1,0 +1,47 @@
+{
+  "entities": {
+    "Chat": {
+      "title": "Chat Session",
+      "description": "Represents a single chat conversation thread.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "The title of the chat." },
+        "userId": { "type": "string", "description": "The UID of the owner." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "model": { "type": "string", "enum": ["gemini-flash-latest", "gemini-3.1-pro-preview"] },
+        "temperature": { "type": "number" },
+        "maxTokens": { "type": "number" }
+      },
+      "required": ["userId", "createdAt", "updatedAt", "model"]
+    },
+    "Message": {
+      "title": "Chat Message",
+      "description": "A single message within a chat.",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["user", "model"] },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "attachment": {
+          "type": "object",
+          "properties": {
+            "mimeType": { "type": "string" },
+            "data": { "type": "string", "description": "Base64 data" }
+          }
+        }
+      },
+      "required": ["role", "content", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/chats/{chatId}": {
+      "schema": "Chat",
+      "description": "Root collection for chats."
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Subcollection for messages in a chat."
+    }
+  }
+}

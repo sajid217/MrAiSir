@@ -1,0 +1,78 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Helper for Chat creation
+    function isValidChatCreate(data) {
+      return data.keys().hasAll(['userId', 'createdAt', 'updatedAt', 'model']) &&
+             data.userId == request.auth.uid &&
+             data.model in ['gemini-flash-latest', 'gemini-3.1-pro-preview'] &&
+             data.createdAt == request.time &&
+             data.updatedAt == request.time;
+    }
+
+    // Helper for Chat updates
+    function isValidChatUpdate(data, existing) {
+      return data.userId == existing.userId &&
+             data.createdAt == existing.createdAt;
+    }
+
+    // Helper for Message validation
+    function isValidMessage(data) {
+      return data.keys().hasAll(['role', 'content', 'createdAt']) &&
+             data.role in ['user', 'model'] &&
+             data.content is string &&
+             data.content.size() <= 100000 &&
+             data.createdAt == request.time;
+    }
+
+    match /chats/{chatId} {
+      allow create: if isSignedIn() && isValidId(chatId) && isValidChatCreate(incoming());
+      allow get: if isSignedIn() && isOwner(existing().userId);
+      allow list: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
+      allow update: if isSignedIn() && isOwner(existing().userId) && 
+                      isValidChatUpdate(incoming(), existing()) &&
+                      incoming().updatedAt == request.time &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['title', 'updatedAt', 'model', 'temperature', 'maxTokens']);
+      allow delete: if isSignedIn() && isOwner(existing().userId);
+
+      match /messages/{messageId} {
+        allow create: if isSignedIn() && 
+                        get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid &&
+                        isValidId(messageId) && isValidMessage(incoming());
+        allow update: if isSignedIn() && 
+                        get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid &&
+                        incoming().role == existing().role &&
+                        incoming().createdAt == existing().createdAt;
+        allow list, get: if isSignedIn() && 
+                           get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid;
+        allow delete: if isSignedIn() && 
+                        get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid;
+      }
+    }
+  }
+}
