@@ -341,7 +341,7 @@ export default function App() {
             <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">Welcome to MyAI</h1>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Welcome to Qubic Ai</h1>
             <p className="text-zinc-500 mt-2 text-sm">Sign in to start secure, persistent conversations with Gemini 2.0.</p>
           </div>
           <Button 
@@ -482,7 +482,7 @@ export default function App() {
               {isSidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeft size={18} />}
             </Button>
             <div className="flex items-center gap-3">
-              <span className="font-bold tracking-tight text-sm dark:text-zinc-100">MyAI</span>
+              <span className="font-bold tracking-tight text-sm dark:text-zinc-100">Qubic Ai</span>
               {activeChat && (
                 <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 text-[10px] font-bold border border-emerald-500/20 uppercase">
                   {activeChat.model.replace('gemini-', '').replace('-latest', '').toUpperCase()}
@@ -712,7 +712,7 @@ export default function App() {
                     handleSendMessage();
                   }
                 }}
-                placeholder="Message MyAI..."
+                placeholder="Message Qubic Ai..."
                 rows={1}
                 className="w-full bg-transparent border-none text-sm p-3 focus:ring-0 outline-none resize-none text-slate-900 dark:text-zinc-100 placeholder-zinc-500 min-h-[50px] max-h-40"
                 style={{ height: 'auto' }}

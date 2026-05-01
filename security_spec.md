@@ -1,4 +1,4 @@
-# Security Specification - MyAI
+# Security Specification - Qubic Ai
 
 ## 1. Data Invariants
 - A **Chat** must have a `userId` that matches the creator's UID.

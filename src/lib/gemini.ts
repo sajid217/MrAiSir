@@ -22,7 +22,7 @@ export async function* streamGeminiResponse(
     config: {
       temperature: config?.temperature ?? 0.7,
       maxOutputTokens: config?.maxTokens ?? 4000,
-      systemInstruction: config?.systemInstruction || "You are MyAI, a helpful and friendly personal assistant.",
+      systemInstruction: config?.systemInstruction || "You are Qubic Ai, a helpful and friendly personal assistant.",
     }
   });
 
