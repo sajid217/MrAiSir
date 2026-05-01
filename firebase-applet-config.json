@@ -1,10 +1,10 @@
 {
-  "projectId": "moviechole",
-  "appId": "1:946017433031:web:6631ad3eb14ca6b1e095e2",
-  "apiKey": "AIzaSyAD4ZZIXiSO8IPgDFL6g0nPomZn4g3qGkw",
-  "authDomain": "moviechole.firebaseapp.com",
+  "projectId": "gen-lang-client-0977558014",
+  "appId": "1:1043753547391:web:a5630a45f44ff4e76ef14a",
+  "apiKey": "AIzaSyBdRCYKOLoVW-j4mwlgD4ZLA7rk8sxVcq4",
+  "authDomain": "gen-lang-client-0977558014.firebaseapp.com",
   "firestoreDatabaseId": "ai-studio-70d14c8d-721c-4c35-8d7a-735aed97242b",
-  "storageBucket": "moviechole.firebasestorage.app",
-  "messagingSenderId": "946017433031",
+  "storageBucket": "gen-lang-client-0977558014.firebasestorage.app",
+  "messagingSenderId": "1043753547391",
   "measurementId": ""
 }

@@ -1,19 +1,21 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny
+    // 0. Default Deny
     match /{document=**} {
       allow read, write: if false;
     }
 
+    // 0.1 Test Connection Path
+    match /test/connection {
+      allow get: if true;
+    }
+
+    // Phase 3: Primitives
     function isSignedIn() {
       return request.auth != null;
     }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
+    
     function isValidId(id) {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
@@ -26,52 +28,68 @@ service cloud.firestore {
       return resource.data;
     }
 
-    // Helper for Chat creation
-    function isValidChatCreate(data) {
-      return data.keys().hasAll(['userId', 'createdAt', 'updatedAt', 'model']) &&
-             data.userId == request.auth.uid &&
-             data.model in ['gemini-flash-latest', 'gemini-3.1-pro-preview'] &&
-             data.createdAt == request.time &&
-             data.updatedAt == request.time;
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Helper for Chat updates
-    function isValidChatUpdate(data, existing) {
-      return data.userId == existing.userId &&
-             data.createdAt == existing.createdAt;
-    }
-
-    // Helper for Message validation
-    function isValidMessage(data) {
-      return data.keys().hasAll(['role', 'content', 'createdAt']) &&
-             data.role in ['user', 'model'] &&
-             data.content is string &&
-             data.content.size() <= 100000 &&
-             data.createdAt == request.time;
+    // 1. Chat Validation
+    function isValidChat(data) {
+      return data.userId == request.auth.uid &&
+             (data.get('model', '') is string && data.get('model', '').size() <= 100) &&
+             (data.get('title', '') is string && data.get('title', '').size() <= 500);
     }
 
     match /chats/{chatId} {
-      allow create: if isSignedIn() && isValidId(chatId) && isValidChatCreate(incoming());
+      // Create: Match UID and server timestamps
+      allow create: if isSignedIn() && 
+                      isValidChat(incoming()) &&
+                      incoming().keys().hasAll(['userId', 'createdAt', 'updatedAt', 'model']) &&
+                      incoming().createdAt == request.time &&
+                      incoming().updatedAt == request.time;
+      
+      // Get: Owner only
       allow get: if isSignedIn() && isOwner(existing().userId);
-      allow list: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
-      allow update: if isSignedIn() && isOwner(existing().userId) && 
-                      isValidChatUpdate(incoming(), existing()) &&
+      
+      // List: SECURE LIST (Pillar 8)
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      // Update: Action-Based Pattern (Pillar 4)
+      allow update: if isSignedIn() && isOwner(existing().userId) &&
                       incoming().updatedAt == request.time &&
-                      incoming().diff(existing()).affectedKeys().hasOnly(['title', 'updatedAt', 'model', 'temperature', 'maxTokens']);
+                      (
+                        // Action: Update Title
+                        incoming().diff(existing()).affectedKeys().hasAny(['title', 'updatedAt']) ||
+                        // Action: Update Settings
+                        incoming().diff(existing()).affectedKeys().hasAny(['model', 'temperature', 'maxTokens', 'updatedAt'])
+                      );
+      
       allow delete: if isSignedIn() && isOwner(existing().userId);
 
+      // 2. Message Validation
+      function isValidMessage(data) {
+        return (data.get('role', '') in ['user', 'model']) &&
+               (data.get('content', '') is string && data.get('content', '').size() <= 100000);
+      }
+
       match /messages/{messageId} {
-        allow create: if isSignedIn() && 
-                        get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid &&
-                        isValidId(messageId) && isValidMessage(incoming());
-        allow update: if isSignedIn() && 
-                        get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid &&
-                        incoming().role == existing().role &&
-                        incoming().createdAt == existing().createdAt;
-        allow list, get: if isSignedIn() && 
-                           get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid;
-        allow delete: if isSignedIn() && 
-                        get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid;
+        // Relational Sync (Pillar 1): Check parent chat ownership
+        function getChatOwnerId() {
+          return get(/databases/$(database)/documents/chats/$(chatId)).data.userId;
+        }
+
+        allow create: if isSignedIn() && getChatOwnerId() == request.auth.uid &&
+                        isValidMessage(incoming()) &&
+                        incoming().keys().hasAll(['role', 'content', 'createdAt']) &&
+                        incoming().createdAt == request.time;
+        
+        allow update: if isSignedIn() && getChatOwnerId() == request.auth.uid &&
+                        // Allow updating content (for streaming AI response)
+                        incoming().diff(existing()).affectedKeys().hasOnly(['content']) &&
+                        incoming().content is string && incoming().content.size() <= 100000;
+        
+        allow list, get: if isSignedIn() && getChatOwnerId() == request.auth.uid;
+        
+        allow delete: if isSignedIn() && getChatOwnerId() == request.auth.uid;
       }
     }
   }

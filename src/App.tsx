@@ -69,9 +69,10 @@ export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [attachment, setAttachment] = useState<{ mimeType: string, data: string } | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
   
   // Settings
-  const [selectedModel, setSelectedModel] = useState('gemini-flash-latest');
+  const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(2000);
 
@@ -254,37 +255,82 @@ export default function App() {
   };
 
   const toggleVoice = () => {
-    if (!('webkitSpeechRecognition' in window)) {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
       toast.error("Speech recognition not supported in this browser.");
       return;
     }
 
     if (isRecording) {
-      (window as any).recognition.stop();
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
       setIsRecording(false);
       return;
     }
 
-    const recognition = new (window as any).webkitSpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    try {
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
 
-    recognition.onstart = () => setIsRecording(true);
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      setInput(prev => prev + ' ' + transcript);
-      setIsRecording(false);
-    };
-    recognition.onerror = () => setIsRecording(false);
-    recognition.onend = () => setIsRecording(false);
+      recognition.onstart = () => {
+        setIsRecording(true);
+        toast.info("Listening...", { id: "voice-toast", duration: 2000 });
+      };
+      
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript) {
+          setInput(prev => {
+            const lastChar = prev.trim().slice(-1);
+            const needsSpace = prev.length > 0 && lastChar !== ' ';
+            return (prev.trim() + (needsSpace ? ' ' : '') + transcript).trim();
+          });
+        }
+      };
 
-    recognition.start();
-    (window as any).recognition = recognition;
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
+        setIsRecording(false);
+        if (event.error !== 'no-speech') {
+          toast.error(`Speech error: ${event.error}`, { id: "voice-toast" });
+        }
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognition.start();
+    } catch (err) {
+      console.error("Failed to start speech recognition", err);
+      toast.error("Cloud not start voice recording");
+    }
   };
 
   const speak = (text: string) => {
     const utterance = new SpeechSynthesisUtterance(text);
     window.speechSynthesis.speak(utterance);
+  };
+
+  const handleSignIn = async () => {
+    try {
+      await signIn();
+    } catch (err: any) {
+      if (err.code === 'auth/unauthorized-domain') {
+        const domain = window.location.hostname;
+        toast.error("Unauthorized Domain", {
+          description: `Add "${domain}" to your Firebase Console under Authentication > Settings > Authorized Domains.`,
+          duration: 10000,
+        });
+      } else {
+        toast.error("Sign in failed: " + err.message);
+      }
+    }
   };
 
   if (!user) {
@@ -299,7 +345,7 @@ export default function App() {
             <p className="text-zinc-500 mt-2 text-sm">Sign in to start secure, persistent conversations with Gemini 2.0.</p>
           </div>
           <Button 
-            onClick={signIn}
+            onClick={handleSignIn}
             className="w-full bg-white hover:bg-zinc-200 text-black py-6 rounded-xl font-bold flex items-center justify-center gap-3 transition-all"
           >
             <User size={20} />
@@ -376,8 +422,9 @@ export default function App() {
                 onChange={(e) => setSelectedModel(e.target.value)}
                 className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md py-1.5 px-3 text-xs text-zinc-700 dark:text-zinc-300 outline-none ring-1 ring-emerald-500/0 focus:ring-emerald-500 transition-all"
               >
-                <option value="gemini-flash-latest">Gemini 2.0 Flash</option>
+                <option value="gemini-3-flash-preview">Gemini 2.0 Flash</option>
                 <option value="gemini-3.1-pro-preview">Gemini 1.5 Pro</option>
+                <option value="gemini-3.1-flash-lite-preview">Gemini 2.0 Flash Lite</option>
               </select>
             </div>
 
@@ -463,8 +510,9 @@ export default function App() {
                       onChange={(e) => setSelectedModel(e.target.value)}
                       className="w-full p-2 rounded-lg bg-slate-100 dark:bg-slate-800 border-none text-sm"
                     >
-                      <option value="gemini-flash-latest">Gemini 2.0 Flash</option>
+                      <option value="gemini-3-flash-preview">Gemini 2.0 Flash</option>
                       <option value="gemini-3.1-pro-preview">Gemini 1.5 Pro</option>
+                      <option value="gemini-3.1-flash-lite-preview">Gemini 2.0 Flash Lite</option>
                     </select>
                   </div>
                   <div className="space-y-4">
@@ -612,6 +660,33 @@ export default function App() {
         {/* Input Area */}
         <div id="input-container" className="absolute bottom-0 left-0 right-0 p-6 pt-0 bg-transparent">
           <div className="max-w-3xl mx-auto">
+            {isRecording && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 mb-2 px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-full w-fit mx-auto"
+              >
+                <div className="flex gap-1 items-end h-4">
+                  <motion.div 
+                    animate={{ height: [4, 12, 4] }}
+                    transition={{ repeat: Infinity, duration: 1, delay: 0 }}
+                    className="w-1 bg-red-500 rounded-full"
+                  />
+                  <motion.div 
+                    animate={{ height: [8, 16, 8] }}
+                    transition={{ repeat: Infinity, duration: 1, delay: 0.2 }}
+                    className="w-1 bg-red-500 rounded-full"
+                  />
+                  <motion.div 
+                    animate={{ height: [4, 12, 4] }}
+                    transition={{ repeat: Infinity, duration: 1, delay: 0.4 }}
+                    className="w-1 bg-red-500 rounded-full"
+                  />
+                </div>
+                <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Listening...</span>
+              </motion.div>
+            )}
+
             {attachment && (
               <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mb-3 inline-block relative border-2 border-emerald-500 rounded-2xl p-1 bg-zinc-900 group shadow-2xl">
                 <img 

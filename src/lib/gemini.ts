@@ -1,7 +1,8 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
 // Standard initialization for AI Studio
-const genAI = new GoogleGenAI({ 
+// Standard initialization for AI Studio
+const ai = new GoogleGenAI({ 
   apiKey: process.env.GEMINI_API_KEY || '' 
 });
 
@@ -12,14 +13,15 @@ export async function* streamGeminiResponse(
   attachment?: { mimeType: string; data: string },
   config?: any
 ) {
-  const model = modelName || 'gemini-flash-latest';
+  // Use recommended models if not specified or legacy
+  const model = modelName === 'gemini-flash-latest' ? 'gemini-3-flash-preview' : modelName;
   
-  const chat = genAI.chats.create({
+  const chat = ai.chats.create({
     model: model,
     history: history,
     config: {
       temperature: config?.temperature ?? 0.7,
-      maxOutputTokens: config?.maxTokens ?? 2000,
+      maxOutputTokens: config?.maxTokens ?? 4000,
       systemInstruction: config?.systemInstruction || "You are MyAI, a helpful and friendly personal assistant.",
     }
   });
@@ -44,11 +46,11 @@ export async function* streamGeminiResponse(
 
 export async function generateChatTitle(firstMessage: string) {
   try {
-    const response = await genAI.models.generateContent({
-      model: "gemini-flash-latest",
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
       contents: `Generate a very short (max 4 words) title for a chat that starts with: "${firstMessage}"`,
     });
-    return response.text.trim().replace(/^"|"$/g, '');
+    return response.text?.trim().replace(/^"|"$/g, '') || "New Chat";
   } catch (error) {
     console.error("Title generation failed", error);
     return "New Chat";
